@@ -5,8 +5,8 @@ import math
 import pandas as pd
 
 from heladeria import MESES
+from pipeline import MARGEN_SEGURIDAD_DIAS
 
-MARGEN_SEGURIDAD_DIAS = 2
 MESES_PARA_VALIDAR = range(7, 13)
 MESES_RECIENTES = range(10, 13)
 UMBRAL_CAMBIO_TENDENCIA = 0.05
@@ -52,6 +52,12 @@ class Pronostico:
     def sabores_sin_historial(self):
         """Sabores sin ventas en los dos años: sin el año anterior no se puede medir su crecimiento."""
         return list(self._crecimiento[self._crecimiento.isna()].index)
+
+    def insumos_sin_plan(self):
+        """Insumos que solo usan los sabores sin pronóstico: el plan de compras no los incluye."""
+        recetas = self.heladeria.recetas
+        con_pronostico = set(recetas[recetas["sabor"].isin(self.sabores_con_pronostico())]["insumo"])
+        return sorted(set(recetas["insumo"]) - con_pronostico)
 
     def cambios_de_tendencia(self):
         """Sabores cuyo crecimiento de los últimos meses se aleja del crecimiento del año.

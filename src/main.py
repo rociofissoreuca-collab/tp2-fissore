@@ -142,7 +142,12 @@ class App:
         print(self.pronostico.compras_del_mes(mes).round(2).to_string())
         print("\ncompra = consumo + seguridad - stock_inicial. seguridad: lo que se consume en los días que tarda el "
               "proveedor, más un margen.\npedidos: en cuántas veces conviene comprar en el mes según la vida útil del insumo.")
-        
+        sin_historial = self.pronostico.sabores_sin_historial()
+        if sin_historial:
+            print(f"\n⚠ No incluye lo que usan los sabores sin pronóstico ({', '.join(sin_historial)}). "
+                  f"Insumos sin plan: {', '.join(self.pronostico.insumos_sin_plan()) or 'ninguno'}.")
+
+            
     def ver_graficos(self):
         opciones = {
             "Ventas mensuales, un año contra el otro": self.grafico_ventas,

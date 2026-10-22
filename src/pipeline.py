@@ -27,7 +27,8 @@ COLUMNAS_TEXTO = {
     "recetas": ["sabor", "insumo"],
     "insumos": ["insumo", "unidad"],
 }
-TABLAS_OPCIONALES = ["merma"]  # pueden venir sin filas: una heladería puede no registrar merma
+MARGEN_SEGURIDAD_DIAS = 2  # días de stock de seguridad, además de los que tarda el proveedor
+TABLAS_OPCIONALES = ["merma"]  # pueden faltar o venir sin filas: una heladería puede no registrar merma
 PATRON_FECHA = r"\d{4}-\d{2}-\d{2}"
 VECES_LA_MEDIANA = 10
 
@@ -47,21 +48,32 @@ def es_fecha_existente(texto):
 
 
 def leer_tablas(carpeta):
-    """Lee los cuatro archivos de la carpeta con la fuente que corresponde a cada formato."""
+    """Lee los archivos de la carpeta con la fuente que corresponde a cada formato. Una tabla opcional que falta queda vacía."""
     carpeta = Path(carpeta)
     if not carpeta.is_dir():
         raise FileNotFoundError(f"No existe la carpeta de datos {carpeta}")
-    return {nombre: fuente_para(carpeta / archivo).cargar() for nombre, archivo in ARCHIVOS.items()}
-
+    tablas = {}
+    for nombre, archivo in ARCHIVOS.items():
+        if nombre in TABLAS_OPCIONALES and not (carpeta / archivo).exists():
+            tablas[nombre] = pd.DataFrame(columns=COLUMNAS[nombre])
+        else:
+            tablas[nombre] = fuente_para(carpeta / archivo).cargar()
+    return tablas
 
 def validar_esquema(tabla, nombre):
     """Frena con un mensaje claro si a la tabla le faltan columnas o no tiene filas."""
     faltan = [columna for columna in COLUMNAS[nombre] if columna not in tabla.columns]
     if faltan:
-        raise ValueError(f"A la tabla '{nombre}' le faltan las columnas: {', '.join(faltan)}")
-    if len(tabla) == 0 and nombre not in TABLAS_OPCIONALES:
-        raise ValueError(f"La tabla '{nombre}' está vacía")
+        pista = ""
+        if len(tabla.columns) == 1 and ";" in tabla.columns[0]:
+            pista = ". Parece separado con punto y coma: guardalo separado con comas y con punto decimal"
+        raise ValueError(f"A la tabla '{nombre}' le faltan las columnas: {', '.join(faltan)}{pista}")
 
+def normalizar_encabezados(tabla):
+    """Encabezados en minúscula y sin espacios en los extremos, sobre una copia: "Fecha " y "fecha" son lo mismo."""
+    tabla = tabla.copy()
+    tabla.columns = [str(columna).strip().lower() for columna in tabla.columns]
+    return tabla
 
 def normalizar_campos(tabla, columnas):
     """Pasa los textos a minúscula y sin espacios en los extremos, sobre una copia."""
@@ -110,12 +122,17 @@ def verificar_catalogos(recetas, insumos):
         raise ValueError("Hay recetas con cantidades que no son positivas")
     if (insumos["stock_actual"] < 0).any() or (insumos["dias_entrega"] < 0).any() or (insumos["vida_util_dias"] <= 0).any():
         raise ValueError("insumos.json tiene stock, días de entrega o vida útil fuera de rango")
+    se_vencen = insumos[insumos["dias_entrega"] + MARGEN_SEGURIDAD_DIAS > insumos["vida_util_dias"]]["insumo"]
+    if len(se_vencen) > 0:
+        raise ValueError(f"El stock de seguridad de {', '.join(se_vencen)} se vence antes de usarse: los días de entrega "
+                         f"más {MARGEN_SEGURIDAD_DIAS} de margen superan su vida útil")
 
 
 def preparar_datos(carpeta):
     """El flujo completo. Devuelve las tablas limpias y una tabla con todas las filas rechazadas."""
     tablas = leer_tablas(carpeta)
     for nombre in tablas:
+        tablas[nombre] = normalizar_encabezados(tablas[nombre])
         validar_esquema(tablas[nombre], nombre)
         tablas[nombre] = normalizar_campos(tablas[nombre], COLUMNAS_TEXTO[nombre])
 

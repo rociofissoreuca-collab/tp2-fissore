@@ -27,8 +27,11 @@ class FuenteCSV(FuenteDatos):
     extension = ".csv"
 
     def cargar(self):
-        return pd.read_csv(self.ruta, encoding="utf-8")
-
+        try:
+            return pd.read_csv(self.ruta, encoding="utf-8")
+        except UnicodeDecodeError:
+            raise ValueError(f"{self.ruta.name} no está guardado en UTF-8. En Excel: Guardar como → "
+                             "CSV UTF-8 (delimitado por comas)")
 
 class FuenteJSON(FuenteDatos):
     """El archivo debe ser una lista de objetos con los mismos campos (uno por registro)."""
