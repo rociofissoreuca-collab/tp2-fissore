@@ -1,8 +1,10 @@
 """Genera los datos simulados de la heladería (2024 y 2025).
 
 Ejecutar desde la carpeta del proyecto:  python data/generar_datos.py
-Con la misma semilla se obtienen siempre los mismos archivos.
+Las reglas de la simulación y las situaciones especiales están fijas en este archivo.
+La semilla solo controla la variación aleatoria: con la misma semilla se obtienen los mismos datos.
 """
+
 import json
 from pathlib import Path
 
@@ -13,7 +15,13 @@ SEMILLA = 42
 DESVIO_VENTAS = 0.15  # las ventas de un día varían ±15 % alrededor de lo esperado
 DESVIO_MERMA = 0.2
 CARPETA = Path(__file__).resolve().parent
+INICIO, FIN = "2024-01-01", "2025-12-31"
 DIAS_CERRADO = ["2024-01-01", "2024-12-25", "2025-01-01", "2025-12-25"]
+AUMENTO_FIN_DE_SEMANA = 1.3
+EXPONENTE_AGUA = 1.3  # los sabores al agua dependen más de la temporada
+CORTES_DE_LUZ = ["2024-02-10", "2025-01-18"]
+SABORES_EN_CORTE = 11
+KG_POR_CORTE = (2, 4)
 
 # Cuánto se vende en un mes respecto de un mes promedio (enero a diciembre)
 ESTACIONALIDAD = [1.85, 1.6, 1.2, 0.8, 0.55, 0.4, 0.38, 0.45, 0.7, 1.0, 1.35, 1.9]
@@ -36,6 +44,7 @@ SABORES = {
     "maracuyá": (2.5, 0.0, "agua", 0.05),
 }
 MARACUYA_DESDE = "2025-03-01"
+MENTA_CAE_DESDE, CAIDA_MENTA = "2025-07-01", 0.85
 
 # Insumos por kg de helado
 RECETAS = {
@@ -76,7 +85,7 @@ INSUMOS = {
 
 def simular_ventas(generador):
     """Kg vendidos de cada sabor por día, con estacionalidad, tendencia, fin de semana y ruido."""
-    dias = pd.date_range("2024-01-01", "2025-12-31")
+    pd.date_range(INICIO, FIN)
     dias = dias[~dias.isin(pd.to_datetime(DIAS_CERRADO))]
     filas = []
     for sabor, (kg_base, crecimiento, tipo, _) in SABORES.items():
@@ -85,12 +94,12 @@ def simular_ventas(generador):
                 continue
             estacion = ESTACIONALIDAD[dia.month - 1]
             if tipo == "agua":
-                estacion = estacion ** 1.3
-            años = (dia - pd.Timestamp("2024-01-01")).days / 365
+                estacion ** EXPONENTE_AGUA
+            años = (dia - pd.Timestamp(INICIO)).days / 365
             tendencia = (1 + crecimiento) ** años
-            if sabor == "menta granizada" and dia >= pd.Timestamp("2025-07-01"):
-                tendencia *= 0.85
-            finde = 1.3 if dia.dayofweek >= 5 else 1.0
+            if sabor == "menta granizada" and dia >= pd.Timestamp(MENTA_CAE_DESDE):
+                tendencia *= CAIDA_MENTA
+            finde = AUMENTO_FIN_DE_SEMANA if dia.dayofweek >= 5 else 1.0
             ruido = generador.normal(1, DESVIO_VENTAS)
             kg = kg_base * estacion * tendencia * finde * ruido
             filas.append({"fecha": dia.strftime("%Y-%m-%d"), "sabor": sabor, "kg": round(kg, 2)})
@@ -105,11 +114,11 @@ def simular_merma(ventas, generador):
     for _, fila in por_semana.iterrows():
         proporcion = SABORES[fila["sabor"]][3]
         kg = fila["kg"] * proporcion * generador.normal(1, DESVIO_MERMA)
-        filas.append({"fecha": min(fila["semana"], "2025-12-31"), "sabor": fila["sabor"],
+        filas.append({"fecha": min(fila["semana"], FIN), "sabor": fila["sabor"],
                       "kg": round(kg, 2), "motivo": "cristalizado"})
-    for fecha in ["2024-02-10", "2025-01-18"]:
-        for sabor in list(SABORES)[:11]:
-            filas.append({"fecha": fecha, "sabor": sabor, "kg": round(generador.uniform(2, 4), 2), "motivo": "corte de luz"})
+    for fecha in CORTES_DE_LUZ:
+        for sabor in list(SABORES)[:SABORES_EN_CORTE]:
+            filas.append({"fecha": fecha, "sabor": sabor, "kg": round(generador.uniform(*KG_POR_CORTE), 2), "motivo": "corte de luz"})
     return pd.DataFrame(filas).sort_values(["fecha", "sabor"]).reset_index(drop=True)
 
 
