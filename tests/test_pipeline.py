@@ -71,6 +71,8 @@ class TestFlujoCompleto(unittest.TestCase):
         self.assertTrue((tablas["ventas"]["kg"] > 0).all())
         self.assertFalse(tablas["ventas"].duplicated(["fecha", "sabor"]).any())
         self.assertIn("dulce de leche", set(tablas["ventas"]["sabor"]))
+        de_ventas = rechazos[rechazos["tabla"] == "ventas"]
+        self.assertEqual(list(crudas.loc[de_ventas["fila"] - 2, "sabor"]), list(de_ventas["sabor"]))
 
     def test_receta_con_insumo_desconocido(self):
         tablas = leer_tablas(DATOS)
@@ -90,7 +92,7 @@ class TestFlujoCompleto(unittest.TestCase):
     def test_merma_vacia_se_acepta(self):
         with tempfile.TemporaryDirectory() as carpeta:
             copiar_datos(carpeta)
-            (Path(carpeta) / "merma.csv").write_text("fecha,sabor,kg,motivo\n", encoding="utf-8")
+            (Path(carpeta) / "merma.csv").unlink()
             tablas, _ = preparar_datos(carpeta)
         self.assertEqual(len(tablas["merma"]), 0)
         self.assertGreater(len(tablas["ventas"]), 0)

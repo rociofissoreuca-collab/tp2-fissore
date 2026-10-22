@@ -5,8 +5,8 @@ import math
 import pandas as pd
 
 from heladeria import MESES
+from pipeline import MARGEN_SEGURIDAD_DIAS
 
-MARGEN_SEGURIDAD_DIAS = 2
 MESES_PARA_VALIDAR = range(7, 13)
 MESES_RECIENTES = range(10, 13)
 UMBRAL_CAMBIO_TENDENCIA = 0.05
@@ -52,6 +52,12 @@ class Pronostico:
     def sabores_sin_historial(self):
         """Sabores sin ventas en los dos años: sin el año anterior no se puede medir su crecimiento."""
         return list(self._crecimiento[self._crecimiento.isna()].index)
+
+    def insumos_sin_plan(self):
+        """Insumos que solo usan los sabores sin pronóstico: el plan de compras no los incluye."""
+        recetas = self.heladeria.recetas
+        con_pronostico = set(recetas[recetas["sabor"].isin(self.sabores_con_pronostico())]["insumo"])
+        return sorted(set(recetas["insumo"]) - con_pronostico)
 
     def cambios_de_tendencia(self):
         """Sabores cuyo crecimiento de los últimos meses se aleja del crecimiento del año.
@@ -112,6 +118,7 @@ class Pronostico:
                     "compra": compra,
                     "stock_final": stock[insumo],
                     "pedidos": math.ceil(dias / min(insumos.loc[insumo, "vida_util_dias"], dias)) if compra > 0 else 0,
+                    "seguridad": seguridad[insumo],
                 })
         plan = pd.DataFrame(filas)
         if (plan["stock_final"] < -1e-9).any():
@@ -123,7 +130,8 @@ class Pronostico:
         """Frena con un mensaje claro si el mes no es un entero del 1 al 12."""
         plan = self.plan_compras()
         del_mes = plan[(plan["mes"] == mes) & (plan["compra"] > 0)].set_index("insumo")
-        return del_mes[["unidad", "consumo", "stock_inicial", "compra", "pedidos"]].sort_values("compra", ascending=False)
+        columnas = ["unidad", "consumo", "seguridad", "stock_inicial", "compra", "pedidos"]
+        return del_mes[columnas].sort_values("compra", ascending=False)
 
     def validar(self):
         """Prueba el método en los MESES_PARA_VALIDAR de año_base, como si todavía no hubieran pasado.
