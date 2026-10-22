@@ -71,6 +71,8 @@ class TestFlujoCompleto(unittest.TestCase):
         self.assertTrue((tablas["ventas"]["kg"] > 0).all())
         self.assertFalse(tablas["ventas"].duplicated(["fecha", "sabor"]).any())
         self.assertIn("dulce de leche", set(tablas["ventas"]["sabor"]))
+        de_ventas = rechazos[rechazos["tabla"] == "ventas"]
+        self.assertEqual(list(crudas.loc[de_ventas["fila"] - 2, "sabor"]), list(de_ventas["sabor"]))
 
     def test_receta_con_insumo_desconocido(self):
         tablas = leer_tablas(DATOS)

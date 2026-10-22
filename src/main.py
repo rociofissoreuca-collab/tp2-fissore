@@ -36,7 +36,7 @@ class App:
             "4": (f"Producción de cada sabor para un mes de {self.pronostico.año_objetivo}", self.ver_produccion),
             "5": (f"Compras de insumos para un mes de {self.pronostico.año_objetivo}", self.ver_compras),
             "6": ("Ver gráficos", self.ver_graficos),
-            "7": ("Exportar las tablas a outputs/", self.exportar),
+            "7": (f"Exportar las tablas a {legible(self.carpeta_salidas)}", self.exportar),
         }
 
     def mostrar_menu(self):
@@ -106,8 +106,8 @@ class App:
         if len(rechazos) == 0:
             print("No se rechazó ninguna fila.")
             return
-        print("\nFilas rechazadas:")
-        print(rechazos[["tabla", "fecha", "sabor", "kg", "motivo_rechazo"]].to_string(index=False))
+        print(rechazos[["tabla", "fila", "fecha", "sabor", "kg", "motivo_rechazo"]].to_string(index=False))
+        print("\nfila: número de fila en el archivo original, contando el encabezado como la fila 1.")
 
     def ver_estacionalidad(self):
         print("Kg vendidos por mes (índice: 1 = mes promedio):")
@@ -140,8 +140,9 @@ class App:
     def ver_compras(self):
         mes = self.pedir_mes()
         print(self.pronostico.compras_del_mes(mes).round(2).to_string())
-        print("\npedidos: en cuántas veces conviene comprar en el mes según la vida útil del insumo.")
-
+        print("\ncompra = consumo + seguridad - stock_inicial. seguridad: lo que se consume en los días que tarda el "
+              "proveedor, más un margen.\npedidos: en cuántas veces conviene comprar en el mes según la vida útil del insumo.")
+        
     def ver_graficos(self):
         opciones = {
             "Ventas mensuales, un año contra el otro": self.grafico_ventas,
@@ -230,7 +231,7 @@ def elegir_app(entrada=input, carpeta_salidas=CARPETA_SALIDAS):
             print("⚠ Opción inválida: escribí 1, 2 o 0.")
             continue
         try:
-            app = App(Heladeria(carpeta, nombre), entrada, carpeta_salidas)
+            app = App(Heladeria(carpeta, nombre), entrada, Path(carpeta_salidas) / nombre_archivo(nombre))
         except (FileNotFoundError, ValueError, TypeError, KeyError) as error:
             print(f"⚠ No se pudieron usar esos datos: {error}")
             continue

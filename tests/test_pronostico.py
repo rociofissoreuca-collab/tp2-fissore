@@ -55,6 +55,8 @@ class TestPronostico(unittest.TestCase):
     def test_el_plan_de_compras_conserva_las_cantidades(self):
         plan = self.pronostico.plan_compras()
         self.assertTrue((plan["stock_final"] >= 0).all())
+        esperado = plan["consumo"] + plan["seguridad"] - plan["stock_inicial"]
+        self.assertTrue(((plan["compra"] - esperado.where(esperado > 0, 0)).abs() < 1e-9).all())
         for insumo, filas in plan.groupby("insumo"):
             stock_inicial = self.heladeria.insumos.loc[insumo, "stock_actual"]
             esperado = stock_inicial + filas["compra"].sum() - filas["consumo"].sum()

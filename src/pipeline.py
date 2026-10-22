@@ -128,8 +128,9 @@ def preparar_datos(carpeta):
         ejemplo = rechazos_ventas[rechazos_ventas["motivo_rechazo"] == motivo.index[0]].iloc[0]
         raise ValueError(f"Ninguna venta pasó la limpieza. Motivo más frecuente: {motivo.index[0]} "
                          f"({motivo.iloc[0]} filas). Ejemplo: fecha={ejemplo['fecha']}, sabor={ejemplo['sabor']}, kg={ejemplo['kg']}")
-    rechazos = pd.concat([rechazos_ventas.assign(tabla="ventas"), rechazos_merma.assign(tabla="merma")], ignore_index=True)
-    columnas = ["tabla", "fecha", "sabor", "kg", "motivo", "motivo_rechazo"]
+    rechazos = pd.concat([rechazos_ventas.assign(tabla="ventas", fila=rechazos_ventas.index + 2),
+                          rechazos_merma.assign(tabla="merma", fila=rechazos_merma.index + 2)], ignore_index=True)
+    columnas = ["tabla", "fila", "fecha", "sabor", "kg", "motivo", "motivo_rechazo"]
     return tablas, rechazos[columnas]
 
 def guardar_tabla(tabla, ruta):
