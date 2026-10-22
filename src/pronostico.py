@@ -34,6 +34,11 @@ class Pronostico:
     def __init__(self, heladeria, año_base):
         if año_base not in heladeria.años() or año_base - 1 not in heladeria.años():
             raise ValueError(f"Para pronosticar desde {año_base} se necesitan ventas de {año_base - 1} y {año_base}")
+        for año in (año_base - 1, año_base):
+            sin_ventas = heladeria.kg_por_mes(año).isna().all(axis=1)
+            faltan = [MESES[mes - 1] for mes in sin_ventas[sin_ventas].index]
+            if faltan:
+                raise ValueError(f"Faltan ventas de {año} en: {', '.join(faltan)}. Se necesitan los 12 meses de cada año")
         self.heladeria = heladeria
         self.año_base = año_base
         self.año_objetivo = año_base + 1
@@ -41,12 +46,11 @@ class Pronostico:
         self._kg_anterior = heladeria.kg_por_mes(año_base - 1)
         self._crecimiento = calcular_crecimiento(self._kg_base, self._kg_anterior)
 
-    def crecimiento(self):
-        """Crecimiento de cada sabor de un año al otro (solo los sabores con historial)."""
-        return self._crecimiento.dropna().sort_values(ascending=False).round(3)
+    def sabores_con_pronostico(self):
+        return sorted(self._crecimiento.dropna().index)
 
     def sabores_sin_historial(self):
-        """Sabores que no vendieron en el año anterior: no se pueden pronosticar con este método."""
+        """Sabores sin ventas en los dos años: sin el año anterior no se puede medir su crecimiento."""
         return list(self._crecimiento[self._crecimiento.isna()].index)
 
     def cambios_de_tendencia(self):
@@ -58,19 +62,19 @@ class Pronostico:
         meses = list(MESES_RECIENTES)
         reciente = calcular_crecimiento(self._kg_base.loc[meses], self._kg_anterior.loc[meses])
         diferencia = (reciente - self._crecimiento).dropna()
-        return diferencia[diferencia.abs() > UMBRAL_CAMBIO_TENDENCIA].sort_values().round(3)
+        return diferencia[diferencia.abs() > UMBRAL_CAMBIO_TENDENCIA].sort_values()
 
     def demanda(self, mes):
         """Kg que se espera vender de cada sabor en ese mes del año objetivo."""
         validar_mes(mes)
-        crecimiento = self.crecimiento()
-        return (self._kg_base.loc[mes, crecimiento.index] * (1 + crecimiento)).round(1)
-
+        crecimiento = self._crecimiento.dropna()
+        return self._kg_base.loc[mes, crecimiento.index] * (1 + crecimiento)
+    
     def produccion(self, mes):
         """Kg a producir de cada sabor: lo que se espera vender más lo que se suele tirar."""
         demanda = self.demanda(mes)
         merma = demanda * self.heladeria.tasa_merma().reindex(demanda.index, fill_value=0)
-        tabla = pd.DataFrame({"demanda": demanda, "merma_esperada": merma.round(1)})
+        tabla = pd.DataFrame({"demanda": demanda, "merma_esperada": merma})
         tabla["produccion"] = tabla["demanda"] + tabla["merma_esperada"]
         tabla.index.name = "sabor"
         return tabla.sort_values("produccion", ascending=False)
@@ -80,7 +84,7 @@ class Pronostico:
         produccion = self.produccion(mes)["produccion"].reset_index()
         detalle = produccion.merge(self.heladeria.recetas, on="sabor")
         detalle["cantidad"] = detalle["produccion"] * detalle["cantidad_por_kg"]
-        return detalle.groupby("insumo")["cantidad"].sum().round(2)
+        return detalle.groupby("insumo")["cantidad"].sum()
 
     def plan_compras(self):
         """Compras de cada insumo mes a mes, partiendo del stock actual.
@@ -112,22 +116,24 @@ class Pronostico:
         plan = pd.DataFrame(filas)
         if (plan["stock_final"] < -1e-9).any():
             raise ValueError("El plan de compras dejó stock negativo: revisar los datos de insumos")
-        return plan.round(2)
+        return plan
 
     def compras_del_mes(self, mes):
         validar_mes(mes)
+        """Frena con un mensaje claro si el mes no es un entero del 1 al 12."""
         plan = self.plan_compras()
         del_mes = plan[(plan["mes"] == mes) & (plan["compra"] > 0)].set_index("insumo")
         return del_mes[["unidad", "consumo", "stock_inicial", "compra", "pedidos"]].sort_values("compra", ascending=False)
 
     def validar(self):
-        """Prueba el método en el 2.º semestre de año_base, como si todavía no hubiera pasado.
+        """Prueba el método en los MESES_PARA_VALIDAR de año_base, como si todavía no hubieran pasado.
 
-        El crecimiento se mide con el 1.er semestre (año_base contra el anterior). Se compara mes a mes
+        El crecimiento se mide con los meses anteriores (año_base contra el año anterior). Se compara mes a mes
         contra lo que realmente se vendió y contra un método ingenuo que repite el año anterior.
         """
         meses = list(MESES_PARA_VALIDAR)
-        crecimiento = calcular_crecimiento(self._kg_base.loc[1:6], self._kg_anterior.loc[1:6]).dropna()
+        previos = list(range(1, meses[0]))
+        crecimiento = calcular_crecimiento(self._kg_base.loc[previos], self._kg_anterior.loc[previos]).dropna()
         real = self._kg_base.loc[meses, crecimiento.index]
         ingenuo = self._kg_anterior.loc[meses, crecimiento.index]
         pronostico = ingenuo * (1 + crecimiento)
@@ -139,19 +145,35 @@ class Pronostico:
         })
         tabla.index.name = "sabor"
         resumen = {"error_metodo": error_porcentual(pronostico, real), "error_ingenuo": error_porcentual(ingenuo, real)}
-        return tabla.sort_values("error", ascending=False).round(3), resumen
+        return tabla.sort_values("error", ascending=False), resumen
+
+    def periodo_validacion(self):
+        """Texto del período que se usa para validar, por ejemplo "julio a diciembre de 2025"."""
+        return f"{MESES[MESES_PARA_VALIDAR[0] - 1]} a {MESES[MESES_PARA_VALIDAR[-1] - 1]} de {self.año_base}"
 
     def produccion_anual(self):
         """Kg a producir de cada sabor (filas) en cada mes del año objetivo (columnas)."""
         tabla = pd.DataFrame({MESES[mes - 1]: self.produccion(mes)["produccion"] for mes in range(1, 13)})
         tabla.index.name = "sabor"
-        return tabla.round(1)
+        return tabla
 
-    def resumen_anual(self):
-        """Kg a producir por mes en el año objetivo, junto a lo vendido en el año base."""
-        return pd.DataFrame({f"vendido {self.año_base}": self._kg_base.sum(axis=1).values,
-                             f"producción {self.año_objetivo}": self.produccion_anual().sum().values},
-                            index=MESES).round(1)
+    def produccion_vs_vendido(self, sabor=None):
+        """Kg vendidos por mes en año_base junto a los kg a producir en el año objetivo, de un sabor o del total."""
+        produccion = self.produccion_anual()
+        if sabor is None:
+            vendido, producir = self._kg_base.sum(axis=1), produccion.sum()
+        elif sabor in produccion.index:
+            vendido, producir = self._kg_base[sabor], produccion.loc[sabor]
+        else:
+            raise ValueError(f"{sabor} no tiene pronóstico: no vendió en {self.año_base - 1}")
+        return pd.DataFrame({f"vendido {self.año_base}": vendido.values,
+                             f"producción {self.año_objetivo}": producir.values}, index=MESES)
 
-    def __str__(self):
-        return f"Pronóstico {self.año_objetivo} de {self.heladeria.nombre}, a partir de las ventas de {self.año_base}"
+    def plan_de_insumo(self, insumo):
+        """Consumo, compra y stock a fin de mes de un insumo en cada mes del año objetivo."""
+        plan = self.plan_compras()
+        del_insumo = plan[plan["insumo"] == insumo]
+        if len(del_insumo) == 0:
+            raise ValueError(f"No existe el insumo {insumo}")
+        return pd.DataFrame({columna: del_insumo[columna].values for columna in ["consumo", "compra", "stock_final"]},
+                            index=MESES)

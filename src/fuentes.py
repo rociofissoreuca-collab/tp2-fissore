@@ -22,9 +22,6 @@ class FuenteDatos(ABC):
     def cargar(self):
         """Lee el archivo y devuelve una tabla con una fila por registro."""
 
-    def __str__(self):
-        return f"{type(self).__name__}({self.ruta.name})"
-
 
 class FuenteCSV(FuenteDatos):
     extension = ".csv"
