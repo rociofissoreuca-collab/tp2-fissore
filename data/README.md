@@ -2,7 +2,7 @@
 
 ## Fuente y procedimiento
 
-Los datos son simulados. Se generan con el programa `data/generar_datos.py`, que usa una semilla fija (42), así que cada vez que se ejecuta produce exactamente los mismos archivos:
+Los datos son simulados. Se generan con el programa `data/generar_datos.py`, con la semilla 42. La semilla es un parámetro de generar_tablas(semilla): con la misma semilla se obtienen exactamente los mismos datos y con otra, datos distintos:
 
     python data/generar_datos.py
 
@@ -20,7 +20,7 @@ Los kg vendidos de cada sabor en cada día salen de multiplicar:
 - un factor por mes (en verano se vende más que en invierno),
 - una tendencia anual propia de cada sabor (algunos crecen y otros caen),
 - un aumento del 30 % los sábados y domingos,
-- una variación aleatoria de un día a otro.
+- una variación aleatoria de un día a otro: una normal con media 1 y desvío 0,15 (en la merma, desvío 0,2).
 
 La merma es una parte de lo vendido que se tira (distinta para cada sabor), más dos cortes de luz. Se agregaron a propósito algunos errores de carga (fechas inválidas, kilos negativos, un sabor inexistente, una fila repetida) para probar la limpieza.
 

@@ -10,6 +10,8 @@ import numpy as np
 import pandas as pd
 
 SEMILLA = 42
+DESVIO_VENTAS = 0.15  # las ventas de un día varían ±15 % alrededor de lo esperado
+DESVIO_MERMA = 0.2
 CARPETA = Path(__file__).resolve().parent
 DIAS_CERRADO = ["2024-01-01", "2024-12-25", "2025-01-01", "2025-12-25"]
 
@@ -89,7 +91,7 @@ def simular_ventas(generador):
             if sabor == "menta granizada" and dia >= pd.Timestamp("2025-07-01"):
                 tendencia *= 0.85
             finde = 1.3 if dia.dayofweek >= 5 else 1.0
-            ruido = generador.lognormal(0, 0.15)
+            ruido = generador.normal(1, DESVIO_VENTAS)
             kg = kg_base * estacion * tendencia * finde * ruido
             filas.append({"fecha": dia.strftime("%Y-%m-%d"), "sabor": sabor, "kg": round(kg, 2)})
     return pd.DataFrame(filas).sort_values(["fecha", "sabor"]).reset_index(drop=True)
@@ -102,7 +104,7 @@ def simular_merma(ventas, generador):
     filas = []
     for _, fila in por_semana.iterrows():
         proporcion = SABORES[fila["sabor"]][3]
-        kg = fila["kg"] * proporcion * generador.lognormal(0, 0.3)
+        kg = fila["kg"] * proporcion * generador.normal(1, DESVIO_MERMA)
         filas.append({"fecha": min(fila["semana"], "2025-12-31"), "sabor": fila["sabor"],
                       "kg": round(kg, 2), "motivo": "cristalizado"})
     for fecha in ["2024-02-10", "2025-01-18"]:
@@ -131,33 +133,40 @@ def agregar_errores(ventas, merma):
     return ventas, merma
 
 
-def guardar_json(registros, nombre):
-    with open(CARPETA / nombre, "w", encoding="utf-8") as archivo:
+def guardar_json(registros, ruta):
+    with open(ruta, "w", encoding="utf-8") as archivo:
         json.dump(registros, archivo, ensure_ascii=False, indent=2)
 
 
-def main():
-    generador = np.random.default_rng(SEMILLA)
+def generar_tablas(semilla=SEMILLA):
+    """Genera las cinco tablas de la heladería con la semilla indicada. No escribe archivos."""
+    generador = np.random.default_rng(semilla)
     ventas = simular_ventas(generador)
     merma = simular_merma(ventas, generador)
-
     muestra = ventas.head(60)
-    muestra.to_csv(CARPETA / "muestra_ventas.csv", index=False)
-    guardar_json(muestra.to_dict("records"), "muestra_ventas.json")
-
     ventas, merma = agregar_errores(ventas, merma)
-    ventas.to_csv(CARPETA / "ventas.csv", index=False)
-    merma.to_csv(CARPETA / "merma.csv", index=False)
-
     recetas = [{"sabor": sabor, "insumo": insumo, "cantidad_por_kg": cantidad}
                for sabor, receta in RECETAS.items() for insumo, cantidad in receta.items()]
-    guardar_json(recetas, "recetas.json")
-
     insumos = [{"insumo": insumo, "unidad": unidad, "stock_actual": stock, "dias_entrega": entrega, "vida_util_dias": vida}
                for insumo, (unidad, stock, entrega, vida) in INSUMOS.items()]
-    guardar_json(insumos, "insumos.json")
-    print(f"Datos generados en {CARPETA}: {len(ventas)} ventas, {len(merma)} registros de merma")
+    return {"ventas": ventas, "merma": merma, "muestra": muestra, "recetas": recetas, "insumos": insumos}
 
 
+def guardar_tablas(tablas, carpeta=CARPETA):
+    carpeta = Path(carpeta)
+    tablas["ventas"].to_csv(carpeta / "ventas.csv", index=False)
+    tablas["merma"].to_csv(carpeta / "merma.csv", index=False)
+    tablas["muestra"].to_csv(carpeta / "muestra_ventas.csv", index=False)
+    guardar_json(tablas["muestra"].to_dict("records"), carpeta / "muestra_ventas.json")
+    guardar_json(tablas["recetas"], carpeta / "recetas.json")
+    guardar_json(tablas["insumos"], carpeta / "insumos.json")
+
+
+def main():
+    tablas = generar_tablas(SEMILLA)
+    guardar_tablas(tablas)
+    print(f"Datos generados en {CARPETA} con semilla {SEMILLA}: "
+          f"{len(tablas['ventas'])} ventas, {len(tablas['merma'])} registros de merma")
+    
 if __name__ == "__main__":
     main()
