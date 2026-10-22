@@ -68,6 +68,8 @@ def validar_esquema(tabla, nombre):
         if len(tabla.columns) == 1 and ";" in tabla.columns[0]:
             pista = ". Parece separado con punto y coma: guardalo separado con comas y con punto decimal"
         raise ValueError(f"A la tabla '{nombre}' le faltan las columnas: {', '.join(faltan)}{pista}")
+    if len(tabla) == 0 and nombre not in TABLAS_OPCIONALES:
+        raise ValueError(f"La tabla '{nombre}' está vacía")
 
 def normalizar_encabezados(tabla):
     """Encabezados en minúscula y sin espacios en los extremos, sobre una copia: "Fecha " y "fecha" son lo mismo."""
@@ -126,7 +128,6 @@ def verificar_catalogos(recetas, insumos):
     if len(se_vencen) > 0:
         raise ValueError(f"El stock de seguridad de {', '.join(se_vencen)} se vence antes de usarse: los días de entrega "
                          f"más {MARGEN_SEGURIDAD_DIAS} de margen superan su vida útil")
-
 
 def preparar_datos(carpeta):
     """El flujo completo. Devuelve las tablas limpias y una tabla con todas las filas rechazadas."""

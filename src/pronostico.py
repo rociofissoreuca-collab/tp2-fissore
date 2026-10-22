@@ -22,11 +22,10 @@ def error_porcentual(pronostico, real):
     """De cada 100 kg vendidos, cuántos kg se equivocó el pronóstico (en más o en menos)."""
     return float((pronostico - real).abs().to_numpy().sum() / real.to_numpy().sum())
 
-
 def validar_mes(mes):
+    """Frena con un mensaje claro si el mes no es un entero del 1 al 12."""
     if not isinstance(mes, int) or not 1 <= mes <= 12:
         raise ValueError("El mes tiene que ser un número entero entre 1 y 12")
-
 
 class Pronostico:
     """Pronostica el año siguiente a año_base: mismo mes de año_base × (1 + crecimiento del sabor)."""
@@ -126,8 +125,8 @@ class Pronostico:
         return plan
 
     def compras_del_mes(self, mes):
+        """Insumos que hay que comprar en ese mes, del que más se compra al que menos."""
         validar_mes(mes)
-        """Frena con un mensaje claro si el mes no es un entero del 1 al 12."""
         plan = self.plan_compras()
         del_mes = plan[(plan["mes"] == mes) & (plan["compra"] > 0)].set_index("insumo")
         columnas = ["unidad", "consumo", "seguridad", "stock_inicial", "compra", "pedidos"]

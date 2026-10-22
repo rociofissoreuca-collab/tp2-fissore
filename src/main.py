@@ -118,7 +118,7 @@ class App:
 
     def ver_validacion(self):
         tabla, resumen = self.pronostico.validar()
-        print(f"Pronóstico de {self.pronostico.año_base} usando solo los datos anteriores:")
+        print(f"Pronóstico de {self.pronostico.periodo_validacion()} usando solo los datos anteriores:")
         print(tabla.round(3).to_string())
         print(f"\nError del método: {resumen['error_metodo']:.1%} · "
               f"Error de repetir el año anterior: {resumen['error_ingenuo']:.1%}")

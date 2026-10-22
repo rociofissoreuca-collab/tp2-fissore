@@ -85,7 +85,7 @@ INSUMOS = {
 
 def simular_ventas(generador):
     """Kg vendidos de cada sabor por día, con estacionalidad, tendencia, fin de semana y ruido."""
-    pd.date_range(INICIO, FIN)
+    dias = pd.date_range(INICIO, FIN)
     dias = dias[~dias.isin(pd.to_datetime(DIAS_CERRADO))]
     filas = []
     for sabor, (kg_base, crecimiento, tipo, _) in SABORES.items():
@@ -94,7 +94,7 @@ def simular_ventas(generador):
                 continue
             estacion = ESTACIONALIDAD[dia.month - 1]
             if tipo == "agua":
-                estacion ** EXPONENTE_AGUA
+                estacion = estacion ** EXPONENTE_AGUA
             años = (dia - pd.Timestamp(INICIO)).days / 365
             tendencia = (1 + crecimiento) ** años
             if sabor == "menta granizada" and dia >= pd.Timestamp(MENTA_CAE_DESDE):
