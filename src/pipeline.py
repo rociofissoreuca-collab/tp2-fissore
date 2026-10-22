@@ -27,9 +27,9 @@ COLUMNAS_TEXTO = {
     "recetas": ["sabor", "insumo"],
     "insumos": ["insumo", "unidad"],
 }
-
+TABLAS_OPCIONALES = ["merma"]  # pueden venir sin filas: una heladería puede no registrar merma
 PATRON_FECHA = r"\d{4}-\d{2}-\d{2}"
-KG_MAXIMO_POR_DIA = 100
+VECES_LA_MEDIANA = 10
 
 
 def tiene_formato_fecha(texto):
@@ -59,7 +59,7 @@ def validar_esquema(tabla, nombre):
     faltan = [columna for columna in COLUMNAS[nombre] if columna not in tabla.columns]
     if faltan:
         raise ValueError(f"A la tabla '{nombre}' le faltan las columnas: {', '.join(faltan)}")
-    if len(tabla) == 0:
+    if len(tabla) == 0 and nombre not in TABLAS_OPCIONALES:
         raise ValueError(f"La tabla '{nombre}' está vacía")
 
 
@@ -73,6 +73,7 @@ def normalizar_campos(tabla, columnas):
 
 def separar(tabla, filas_validas, motivo, rechazos):
     """Se queda con las filas válidas y guarda las demás en rechazos, con su motivo."""
+    filas_validas = filas_validas.astype(bool)
     rechazadas = tabla[~filas_validas].assign(motivo_rechazo=motivo)
     if len(rechazadas) > 0:
         rechazos.append(rechazadas)
@@ -88,14 +89,15 @@ def limpiar_registros(tabla, sabores_validos, clave_duplicados):
     kg = pd.to_numeric(tabla["kg"], errors="coerce")
     tabla = separar(tabla, kg > 0, "kg no numérico o no positivo", rechazos)
     kg = pd.to_numeric(tabla["kg"], errors="coerce")
-    tabla = separar(tabla, kg <= KG_MAXIMO_POR_DIA, f"kg fuera de rango (más de {KG_MAXIMO_POR_DIA})", rechazos)
+    tope = tabla["sabor"].map(kg.groupby(tabla["sabor"]).median()) * VECES_LA_MEDIANA
+    tabla = separar(tabla, kg <= tope, f"kg fuera de rango (más de {VECES_LA_MEDIANA} veces la mediana del sabor)", rechazos)
     tabla = separar(tabla, tabla["sabor"].isin(sabores_validos), "sabor sin receta", rechazos)
     tabla = separar(tabla, ~tabla.duplicated(clave_duplicados), "registro duplicado", rechazos)
 
     validas = tabla.assign(fecha=pd.to_datetime(tabla["fecha"], format="%Y-%m-%d"), kg=tabla["kg"].astype(float))
     rechazadas = pd.concat(rechazos) if rechazos else pd.DataFrame(columns=[*tabla.columns, "motivo_rechazo"])
     return validas.reset_index(drop=True), rechazadas
-
+   
 
 def verificar_catalogos(recetas, insumos):
     """Los catálogos no se limpian: si tienen errores, el pronóstico no se puede calcular y se frena."""
@@ -121,11 +123,14 @@ def preparar_datos(carpeta):
     sabores_validos = set(tablas["recetas"]["sabor"])
     tablas["ventas"], rechazos_ventas = limpiar_registros(tablas["ventas"], sabores_validos, ["fecha", "sabor"])
     tablas["merma"], rechazos_merma = limpiar_registros(tablas["merma"], sabores_validos, ["fecha", "sabor", "motivo"])
-
+    if len(tablas["ventas"]) == 0:
+        motivo = rechazos_ventas["motivo_rechazo"].value_counts()
+        ejemplo = rechazos_ventas[rechazos_ventas["motivo_rechazo"] == motivo.index[0]].iloc[0]
+        raise ValueError(f"Ninguna venta pasó la limpieza. Motivo más frecuente: {motivo.index[0]} "
+                         f"({motivo.iloc[0]} filas). Ejemplo: fecha={ejemplo['fecha']}, sabor={ejemplo['sabor']}, kg={ejemplo['kg']}")
     rechazos = pd.concat([rechazos_ventas.assign(tabla="ventas"), rechazos_merma.assign(tabla="merma")], ignore_index=True)
     columnas = ["tabla", "fecha", "sabor", "kg", "motivo", "motivo_rechazo"]
     return tablas, rechazos[columnas]
-
 
 def guardar_tabla(tabla, ruta):
     """Guarda una tabla en CSV, creando la carpeta si hace falta."""

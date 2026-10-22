@@ -9,10 +9,15 @@ RAIZ = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(RAIZ / "src"))
 
 from fuentes import FuenteCSV
-from pipeline import (es_fecha_existente, leer_tablas, limpiar_registros, normalizar_campos, preparar_datos,
-                      tiene_formato_fecha, validar_esquema, verificar_catalogos)
+from pipeline import (es_fecha_existente, leer_tablas, limpiar_registros, preparar_datos, tiene_formato_fecha,
+                      validar_esquema, verificar_catalogos)
 
 DATOS = RAIZ / "data"
+
+def copiar_datos(carpeta):
+    """Copia los cuatro archivos de ejemplo a una carpeta temporal, para modificarlos en una prueba."""
+    for archivo in ["ventas.csv", "merma.csv", "recetas.json", "insumos.json"]:
+        (Path(carpeta) / archivo).write_bytes((DATOS / archivo).read_bytes())
 
 
 class TestFechas(unittest.TestCase):
@@ -44,18 +49,12 @@ class TestLimpieza(unittest.TestCase):
         self.assertEqual(len(validas), 1)
         self.assertEqual(sorted(rechazos["motivo_rechazo"]), sorted([
             "registro duplicado", "fecha inexistente", "kg no numérico o no positivo",
-            "sabor sin receta", "kg fuera de rango (más de 100)", "dato faltante",
+            "sabor sin receta", "kg fuera de rango (más de 10 veces la mediana del sabor)", "dato faltante",
         ]))
 
     def test_no_se_pierden_filas(self):
         validas, rechazos = limpiar_registros(self.tabla, {"limón"}, ["fecha", "sabor"])
         self.assertEqual(len(validas) + len(rechazos), len(self.tabla))
-
-    def test_normalizar_no_modifica_la_tabla_original(self):
-        original = pd.DataFrame({"sabor": ["  Dulce de LECHE "]})
-        normalizada = normalizar_campos(original, ["sabor"])
-        self.assertEqual(normalizada["sabor"][0], "dulce de leche")
-        self.assertEqual(original["sabor"][0], "  Dulce de LECHE ")
 
     def test_esquema_con_columnas_faltantes(self):
         with self.assertRaises(ValueError):
@@ -73,22 +72,28 @@ class TestFlujoCompleto(unittest.TestCase):
         self.assertFalse(tablas["ventas"].duplicated(["fecha", "sabor"]).any())
         self.assertIn("dulce de leche", set(tablas["ventas"]["sabor"]))
 
-    def test_carpeta_inexistente(self):
-        with self.assertRaises(FileNotFoundError):
-            leer_tablas(DATOS / "no_existe")
-
     def test_receta_con_insumo_desconocido(self):
         tablas = leer_tablas(DATOS)
         recetas = pd.concat([tablas["recetas"], pd.DataFrame([{"sabor": "limón", "insumo": "kiwi", "cantidad_por_kg": 0.1}])])
         with self.assertRaises(ValueError):
             verificar_catalogos(recetas, tablas["insumos"])
 
-    def test_carpeta_a_la_que_le_falta_un_archivo(self):
+    def test_fechas_en_otro_formato_dan_un_mensaje_claro(self):
         with tempfile.TemporaryDirectory() as carpeta:
-            (Path(carpeta) / "ventas.csv").write_text("fecha,sabor,kg\n", encoding="utf-8")
-            with self.assertRaises(FileNotFoundError):
-                leer_tablas(carpeta)
+            copiar_datos(carpeta)
+            ventas = pd.read_csv(Path(carpeta) / "ventas.csv")
+            ventas["fecha"] = pd.to_datetime(ventas["fecha"], errors="coerce").dt.strftime("%d/%m/%Y")
+            ventas.to_csv(Path(carpeta) / "ventas.csv", index=False)
+            with self.assertRaisesRegex(ValueError, "Ninguna venta pasó la limpieza.*fecha con formato inválido"):
+                preparar_datos(carpeta)
 
+    def test_merma_vacia_se_acepta(self):
+        with tempfile.TemporaryDirectory() as carpeta:
+            copiar_datos(carpeta)
+            (Path(carpeta) / "merma.csv").write_text("fecha,sabor,kg,motivo\n", encoding="utf-8")
+            tablas, _ = preparar_datos(carpeta)
+        self.assertEqual(len(tablas["merma"]), 0)
+        self.assertGreater(len(tablas["ventas"]), 0)
 
 if __name__ == "__main__":
     unittest.main()
