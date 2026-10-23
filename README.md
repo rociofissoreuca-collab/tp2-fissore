@@ -1,126 +1,98 @@
 # Planificador de producción y compras para una heladería
 
-**Autora:** Rocío Fissore · Programación Orientada a Datos · UCA · Trabajo Práctico 2
+- **Autora:** Rocío Fissore
+- **Asignatura:** Programación Orientada a Datos con Python · Universidad Católica Argentina (UCA) · Trabajo Práctico 2
+- **Repositorio:** https://github.com/rociofissoreuca-collab/tp2-fissore
+- **Licencia:** datos de ejemplo bajo licencia CC BY 4.0
 
-## Problema, usuario y solución
+## Para qué sirve
 
-Una heladería artesanal decide cuánto helado producir y cuántos insumos comprar a partir de la experiencia del encargado. La demanda es muy estacional (en diciembre se vende unas cinco veces lo de julio) y muchos insumos son perecederos: si se produce o se compra de más, la mercadería se pierde; si se produce de menos, faltan sabores.
+En una heladería artesanal la demanda es muy estacional y muchos insumos son perecederos: producir o comprar de más genera pérdidas, y producir de menos deja sabores sin stock. Esta aplicación, pensada para el dueño o encargado de producción, estima **cuántos kilogramos de cada sabor producir y qué cantidad de cada insumo comprar en cada mes del año siguiente**, a partir de las ventas de los dos últimos años.
 
-**Usuario:** el dueño o encargado de producción, que planifica cada mes qué producir y qué pedir a los proveedores.
+El cálculo parte de las ventas del mismo mes del año anterior, ajustadas por el crecimiento de cada sabor; suma la merma habitual, convierte la producción en insumos según las recetas y descuenta el stock disponible, dejando un stock de seguridad. Antes de usar los resultados, la aplicación valida el método contra las ventas reales.
 
-**Pregunta que responde:** ¿cuántos kilos de cada sabor conviene producir y cuánto de cada insumo conviene comprar en cada mes de 2026, según las ventas de 2024 y 2025, el consumo de insumos y la estacionalidad de la demanda?
+**Fuera del alcance:** precios y costos, clima, sabores nuevos y pronóstico diario.
 
-**Solución:** una aplicación de consola que lee y limpia los datos de la heladería y calcula:
+## Qué se obtiene
 
-1. **Demanda** de cada sabor = kg vendidos en el mismo mes de 2025 × (1 + crecimiento del sabor entre 2024 y 2025).
-2. **Producción** = demanda + merma habitual del sabor.
-3. **Consumo de insumos** = producción × receta.
-4. **Compras** = consumo + stock de seguridad − stock disponible. El stock de seguridad cubre los días que tarda el proveedor más 2 días de margen. Los insumos perecederos se piden en varias veces dentro del mes, según su vida útil.
+- Producción mensual recomendada por sabor.
+- Plan de compras mensual por insumo, con la cantidad de pedidos según su vida útil.
+- Error de validación del método, por sabor y total.
+- Cinco gráficos a elección y las tablas exportadas en CSV.
+- Registro de las filas de datos rechazadas, con su motivo.
 
-## Instalación y uso
+**Archivos de salida**, en `outputs/<nombre de la heladería>/`:
 
-Se necesita Python 3. Desde la carpeta del proyecto:
+| Archivo | Contenido | Se genera |
+| --- | --- | --- |
+| `rechazos.csv` | Filas descartadas, con su archivo, su fila y el motivo | Al cargar los datos |
+| `produccion_<año>.csv` | Kg a producir por sabor y por mes | Al exportar (opción 7) |
+| `compras_<año>.csv` | Consumo, stock de seguridad, compra, stock final y pedidos por insumo y por mes | Al exportar (opción 7) |
+| `validacion.csv` | Ventas reales, pronóstico y error por sabor, del método y de repetir el año anterior | Al exportar (opción 7) |
+| `ventas_<sabor>.png`, `produccion_<sabor>.png`, `compras_<insumo>.png`, `validacion.png`, `comparacion_<sabores>.png` | Cada gráfico elegido | Al ver un gráfico (opción 6) |
+
+## Requisitos e instalación
+
+Python 3.9 o superior, con las bibliotecas `pandas`, `numpy` y `matplotlib`:
 
 ```bash
 pip install -r requirements.txt
-python src/main.py                     # abre el menú
-python -m unittest discover tests      # corre las pruebas
-python data/generar_datos.py           # (opcional) vuelve a generar los datos
 ```
 
-Opciones del menú:
+## Uso
 
-1. Ver la carga de datos y las filas rechazadas.
-2. Ver la estacionalidad y el ranking de sabores.
-3. Validar el método de pronóstico.
-4. Producción de cada sabor para un mes de 2026.
-5. Compras de insumos para un mes de 2026.
-6. Exportar resultados y gráficos a `outputs/`.
-0. Salir.
+```bash
+python src/main.py                     # aplicación
+python -m unittest discover tests      # pruebas (28)
+```
+Las pruebas cubren casos normales, entradas inválidas y propiedades del resultado;
+Al iniciar, se elige entre los **datos de ejemplo** o una **carpeta propia**. Luego, el menú ofrece:
 
-Al iniciar, la aplicación guarda las filas rechazadas en `outputs/rechazos.csv`. Si se escribe una opción o un mes inválido, muestra un aviso y vuelve al menú.
+| Opción | Muestra |
+| --- | --- |
+| 1 | Filas rechazadas en la carga |
+| 2 | Estacionalidad y ranking de sabores |
+| 3 | Validación del método |
+| 4 | Producción de un mes (se ingresa el mes, de 1 a 12) |
+| 5 | Compras de un mes (se ingresa el mes, de 1 a 12) |
+| 6 | Gráficos (se elige el gráfico y el sabor o insumo) |
+| 7 | Exportación de las tablas |
 
-## Datos
+Ante una entrada inválida, la aplicación muestra un aviso y vuelve al menú.
 
-Los datos son **simulados** con `data/generar_datos.py`, con semilla fija, así que se obtienen siempre los mismos archivos. Representan dos años (2024 y 2025) de una heladería con 14 sabores y 14 insumos. Licencia CC BY 4.0, sin información personal.
+## Datos necesarios
 
-- `ventas.csv` (unidad de análisis: los kg vendidos de un sabor en un día, 9.763 filas)
-- `merma.csv` (helado que se tiró y el motivo)
-- `recetas.json` (insumos de cada sabor por kg de helado)
-- `insumos.json` (stock, días de entrega y vida útil de cada insumo)
-- `muestra_ventas.csv` y `muestra_ventas.json` (las mismas 60 ventas en los dos formatos)
+Una carpeta con estos archivos:
 
-La procedencia, las variables y las limitaciones de los datos están en [`data/README.md`](data/README.md).
+| Archivo | Una fila es | Columnas |
+| --- | --- | --- |
+| `ventas.csv` | Los kg vendidos de un sabor en un día | `fecha`, `sabor`, `kg` |
+| `merma.csv` (opcional) | Una cantidad de helado descartada | `fecha`, `sabor`, `kg`, `motivo` |
+| `recetas.json` | Un insumo de la receta de un sabor | `sabor`, `insumo`, `cantidad_por_kg` |
+| `insumos.json` | Un insumo | `insumo`, `unidad`, `stock_actual`, `dias_entrega`, `vida_util_dias` |
 
-## Organización del código
+**Condiciones obligatorias:**
+
+- Ventas de los doce meses de los dos últimos años.
+- CSV separados por comas, con punto decimal y codificación UTF-8; fechas con formato AAAA-MM-DD.
+- Nombres de sabores e insumos idénticos entre archivos, incluidas las tildes.
+- `stock_actual` corresponde al stock al 31 de diciembre del último año.
+
+Las filas con errores se excluyen y quedan registradas; si un archivo no cumple el formato, la aplicación indica la corrección necesaria.
+
+Los **datos de ejemplo** (`data/`) corresponden a una heladería simulada de 2024 y 2025, con reglas diseñadas y una variación diaria aleatoria generada con la semilla 42. Su procedencia se documenta en [`data/README.md`](data/README.md).
+
+## Estructura del proyecto
 
 ```
-src/
-  main.py        menú de consola (clase App)
-  fuentes.py     FuenteDatos con cargar(), y sus implementaciones FuenteCSV y FuenteJSON
-  pipeline.py    leer, validar el esquema, normalizar, limpiar y registrar rechazos
-  heladeria.py   clase Heladeria: datos limpios, estacionalidad, ranking y tasa de merma
-  pronostico.py  clase Pronostico: demanda, producción, insumos, compras y validación
-  graficos.py    gráficos con matplotlib
-tests/           pruebas con unittest
-data/            datos, generador y documentación de los datos
-outputs/         resultados (no se suben: se generan con la opción 6)
+src/       código de la aplicación (main.py, fuentes.py, pipeline.py, heladeria.py, pronostico.py, graficos.py)
+tests/     pruebas con unittest
+data/      datos de ejemplo, su generador y su documentación
+outputs/   archivos de salida (no se incluyen en el repositorio)
 ```
-
-- **Herencia:** `FuenteCSV` y `FuenteJSON` heredan de la clase abstracta `FuenteDatos` y cada una implementa `cargar()` para su formato. `fuente_para(ruta)` elige la clase según la extensión, así el resto del programa no depende del formato del archivo.
-- **Expresión regular:** `PATRON_FECHA = r"\d{4}-\d{2}-\d{2}"` valida que la fecha tenga el formato AAAA-MM-DD. Como acepta fechas imposibles como `2025-02-30`, se complementa con `datetime` para comprobar que la fecha exista en el calendario.
-- **Encapsulamiento:** los datos de `Heladeria` se guardan con guion bajo (`_ventas`) y se leen con `@property`, que devuelve una copia.
-
-## Decisiones de limpieza
-
-Las ventas y la merma pasan por estas reglas en orden. Cada fila rechazada se guarda con su motivo en `outputs/rechazos.csv`:
-
-1. Faltan la fecha, el sabor o los kg.
-2. La fecha no tiene el formato AAAA-MM-DD (expresión regular).
-3. La fecha no existe en el calendario.
-4. Los kg no son un número mayor que 0.
-5. Más de 100 kg de un sabor en un día (fuera de rango).
-6. El sabor no tiene receta.
-7. Fila repetida para la misma fecha y sabor (se conserva la primera).
-
-Antes de validar, los textos se pasan a minúscula y sin espacios en los extremos. Los catálogos (recetas e insumos) no se limpian: si tienen un error, la carga se frena con un mensaje, porque sin ellos no se puede calcular el pronóstico. Los días sin ventas no se completan con cero. La merma por corte de luz no se cuenta en la merma de cada sabor, porque es un accidente.
-
-Con los datos del repositorio se rechazan 8 filas, una por cada tipo de error incluido a propósito.
-
-## Ejemplo de resultado
-
-**Validación (opción 3).** Se pronosticó julio a diciembre de 2025 usando solo los datos anteriores y se comparó con lo vendido. El método se equivocó un **3,9 %**; repetir el año anterior se equivocaba un **8,6 %**.
-
-**Producción de diciembre de 2026 (opción 4), primeros sabores:**
-
-```
-                          demanda  merma_esperada  produccion
-dulce de leche granizado    513.2            15.4       528.6
-dulce de leche              472.4             9.4       481.8
-tramontana                  336.4            10.1       346.5
-...
-Total a producir: 3,625.8 kg
-⚠ menta granizada: en los últimos meses cae más que en el resto del año (6 puntos de diferencia). Revisá su producción.
-```
-
-**Compras de enero de 2026 (opción 5), primeros insumos:**
-
-```
-          unidad  consumo  stock_inicial   compra  pedidos
-leche     litros  1405.52           60.0  1481.54        4
-crema     litros   585.24           25.0   616.88        3
-frutilla      kg   175.94            6.0   186.97        8
-...
-```
-
-## Interpretación
-
-En enero conviene comprar unos 1.480 litros de leche repartidos en 4 pedidos, porque dura 10 días, y unos 187 kg de frutilla en 8 pedidos, porque dura 4. El error de validación indica cuánto confiar en estos números: en promedio, el pronóstico se aleja un 4 % de lo que se vende. Los resultados son una guía para decidir, no una decisión automática.
 
 ## Limitaciones
 
-- El método supone que la tendencia de cada sabor se mantiene. Si cambia, el error aumenta: la menta granizada, cuya caída se aceleró en el segundo semestre de 2025, tuvo un error del 14,7 %. Para esos casos la aplicación muestra un aviso, y conviene volver a correr el pronóstico cada mes con los datos nuevos.
-- Los sabores sin ventas en el año anterior (el maracuyá, que empezó en 2025) quedan fuera del pronóstico.
-- Con dos años de datos, el crecimiento se mide con una sola comparación entre años.
-- Los datos son simulados: muestran el método, no una heladería real. Con datos reales el error probablemente sería mayor.
-- Fuera del alcance de esta versión: precios y costos, clima, sabores nuevos y pronóstico diario.
+- Supone que la tendencia de cada sabor se mantiene durante el año; si cambia, la aplicación lo advierte.
+- Los sabores sin ventas en ambos años quedan fuera del pronóstico.
+- Los resultados son una guía para planificar, no una decisión automática.
