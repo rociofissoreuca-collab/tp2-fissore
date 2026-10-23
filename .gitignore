@@ -9,5 +9,5 @@ __pycache__/
 .DS_Store
 .env
 
-# Salidas: se regeneran con la opción 6 del menú
+# Salidas: se regeneran al usar la aplicación
 outputs/

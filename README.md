@@ -45,7 +45,9 @@ pip install -r requirements.txt
 python src/main.py                     # aplicación
 python -m unittest discover tests      # pruebas (28)
 ```
-Las pruebas cubren casos normales, entradas inválidas y propiedades del resultado;
+
+Las pruebas cubren casos normales, entradas inválidas y propiedades del resultado.
+
 Al iniciar, se elige entre los **datos de ejemplo** o una **carpeta propia**. Luego, el menú ofrece:
 
 | Opción | Muestra |
@@ -90,6 +92,31 @@ tests/     pruebas con unittest
 data/      datos de ejemplo, su generador y su documentación
 outputs/   archivos de salida (no se incluyen en el repositorio)
 ```
+## Resultados e interpretación
+
+Con los datos de ejemplo, la aplicación muestra, entre otros, estos resultados:
+
+**Validación del método (opción 3):**
+
+```
+Error del método: 3.7% · Error de repetir el año anterior: 8.6%
+```
+
+**Producción de diciembre de 2026 (opción 4):**
+
+```
+Total a producir: 3,583.6 kg
+⚠ menta granizada: en los últimos meses cae más que en el resto del año (6 puntos de diferencia). Revisá su producción.
+```
+
+**Interpretación:**
+
+- Al pronosticar el segundo semestre de 2025 con los datos anteriores, el método se equivocó un 3,7 % de lo vendido, menos de la mitad que repetir el año anterior (8,6 %). Ajustar cada sabor por su propio crecimiento mejora la planificación.
+- Diciembre es el mes de mayor producción por la estacionalidad: vende 1,95 veces lo que un mes promedio. La planificación tiene que anticipar ese pico en la producción y en las compras.
+- Los insumos perecederos se compran en varios pedidos. En enero, la frutilla, que dura 4 días, se pide 8 veces; la leche, que dura 10, 4 veces.
+- Los avisos marcan dónde el método es menos confiable. La caída de la menta granizada se aceleró y su error fue del 14,9 %. El maracuyá no tiene pronóstico porque no se vendió en 2024.
+- Por eso, los resultados son una guía para planificar y no una decisión automática. Conviene repetir el pronóstico cada mes, a medida que se suman datos nuevos.
+
 
 ## Limitaciones
 

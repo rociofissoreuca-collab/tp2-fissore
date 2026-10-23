@@ -8,7 +8,7 @@ import pandas as pd
 
 import graficos
 from heladeria import Heladeria
-from pipeline import ARCHIVOS,guardar_tabla
+from pipeline import ARCHIVOS, guardar_tabla
 from pronostico import Pronostico
 
 RAIZ = Path(__file__).resolve().parents[1]
